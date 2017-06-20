@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">UdacityBL</string>
+
+    <string name="keyword">keyword...</string>
+    <string name="book_title">Programmers are great</string>
+    <string name="no_authors">no authors</string>
+    <string name="book_authors">martin kair</string>
+    <string name="no_description">no description</string>
+    <string name="book_description">lorem ipsum lorem ipsum</string>
+
+
+</resources>
