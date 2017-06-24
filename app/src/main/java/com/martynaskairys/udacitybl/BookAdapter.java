@@ -1,13 +1,14 @@
 package com.martynaskairys.udacitybl;
 
 import android.content.Context;
-import android.net.Uri;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+
+import com.squareup.picasso.Picasso;
 
 import java.util.List;
 
@@ -20,14 +21,20 @@ public class BookAdapter extends RecyclerView.Adapter<BookAdapter.BookViewHolder
 {
     private final List<Book> mBooks;
     private final OnItemClickListener mListener;
+    private final Context mContext;
 
-    public BookAdapter(List<Book> books, OnItemClickListener listener) {
+
+    public BookAdapter(List<Book> books, OnItemClickListener listener, Context context) {
         mBooks = books;
         mListener = listener;
+        mContext = context.getApplicationContext();
+
     }
+
 
     public interface OnItemClickListener {
         void onItemClick(Book book);
+
     }
 
     @Override
@@ -44,7 +51,11 @@ public class BookAdapter extends RecyclerView.Adapter<BookAdapter.BookViewHolder
         holder.mBookTitle.setText(book.getBookTitle());
         holder.mBookDescription.setText(book.getBookDescription());
         holder.mBookAuthors.setText(book.generateStringOfAuthors());
-        holder.mImageUrl.setImageURI(Uri.parse(book.getImageUrl()));
+
+        if(!book.getImageUrl().isEmpty()) {
+            Picasso.with(mContext).load(book.getImageUrl()).into(holder.mImageUrl);
+        }
+
         holder.bind(mBooks.get(position), mListener);
     }
 

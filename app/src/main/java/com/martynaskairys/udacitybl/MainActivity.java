@@ -1,6 +1,10 @@
 package com.martynaskairys.udacitybl;
 
+import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -10,6 +14,7 @@ import android.support.v7.widget.RecyclerView;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -48,7 +53,6 @@ public class MainActivity extends AppCompatActivity {
     public static final String BOOK_REQUEST_URL = "https://www.googleapis.com/books/v1/volumes?q=";
     public static final String LOG_TAG = MainActivity.class.getSimpleName();
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -58,27 +62,47 @@ public class MainActivity extends AppCompatActivity {
         mRecyclerView.setHasFixedSize(true);
         mLayoutManager = new LinearLayoutManager(this);
         mRecyclerView.setLayoutManager(mLayoutManager);
-
-        mAdapter = new BookAdapter(new ArrayList<Book>(), new BookAdapter.OnItemClickListener() {
-            @Override
-            public void onItemClick(Book book) {
-
-            }
-        });
         mRecyclerView.setAdapter(mAdapter);
-
         mSearchButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                BookAsyncTask task = new BookAsyncTask();
-                task.execute();
+
+                //hide keyboard after search button is pressed
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(mSearchEditText.getWindowToken(), 0);
+
+                ConnectivityManager cm =
+                        (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+
+                NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+                boolean isConnected = activeNetwork != null &&
+                        activeNetwork.isConnectedOrConnecting();
+
+                if (isConnected) {
+                    BookAsyncTask task = new BookAsyncTask();
+                    task.execute();
+                } else {
+                    Toast.makeText(MainActivity.this, "no internet", Toast.LENGTH_SHORT).show();
+                }
             }
         });
     }
 
     private class BookAsyncTask extends AsyncTask<URL, Void, ArrayList<Book>> {
 
+        ProgressDialog progDialog = new ProgressDialog(MainActivity.this);
         private String searchInput = mSearchEditText.getText().toString();
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+
+            progDialog.setMessage("Loading...");
+            progDialog.setIndeterminate(false);
+            progDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+            progDialog.setCancelable(true);
+            progDialog.show();
+        }
 
         protected ArrayList<Book> doInBackground(URL... urls) {
 
@@ -91,50 +115,56 @@ public class MainActivity extends AppCompatActivity {
                 });
                 return null;
             }
-
             searchInput = searchInput.replace(" ", "+");
-
-            URL url = createUrl(BOOK_REQUEST_URL + searchInput);
-
+            URL url = createUrl(BOOK_REQUEST_URL + searchInput + "&maxResults=20");
             String jsonResponse = "";
             try {
                 jsonResponse = makeHttpRequest(url);
             } catch (IOException e) {
-
                 Log.e(LOG_TAG, "IOException", e);
             }
 
             ArrayList<Book> books = extractBookInfoFromJson(jsonResponse);
-
             return books;
-
         }
 
         @Override
         protected void onPostExecute(ArrayList<Book> bookList) {
 
-            if (bookList == null) {
-                mAdapter = new BookAdapter(new ArrayList<Book>(), new BookAdapter.OnItemClickListener() {
-                    @Override
-                    public void onItemClick(Book book) {
+            progDialog.dismiss();
 
-                    }
-                });
+            if (bookList == null) {
+                mAdapter = new BookAdapter(
+                        new ArrayList<Book>(),
+                        new BookAdapter.OnItemClickListener() {
+                            @Override
+                            public void onItemClick(Book book) {
+                            }
+                        },
+                        getApplicationContext()
+                );
                 mRecyclerView.setAdapter(mAdapter);
                 mInfoTextView.setVisibility(View.VISIBLE);
                 return;
             }
-            mAdapter = new BookAdapter(bookList, new BookAdapter.OnItemClickListener() {
-                @Override
-                public void onItemClick(Book book) {
-                    String url = book.getBookInfoLink();
-                    Intent i = new Intent(Intent.ACTION_VIEW);
-                    i.setData(Uri.parse(url));
-                    startActivity(i);
-                }
-            });
+
+            mAdapter =
+                    new BookAdapter(bookList,
+                            new BookAdapter.OnItemClickListener() {
+                                @Override
+                                public void onItemClick(Book book) {
+
+                                    String url = book.getBookInfoLink();
+                                    Intent i = new Intent(Intent.ACTION_VIEW);
+                                    i.setData(Uri.parse(url));
+                                    startActivity(i);
+                                }
+                            },
+                            getApplicationContext()
+                    );
             mRecyclerView.setAdapter(mAdapter);
             mInfoTextView.setVisibility(View.GONE);
+
         }
 
         private URL createUrl(String stringUrl) {
@@ -148,11 +178,13 @@ public class MainActivity extends AppCompatActivity {
             return url;
         }
 
+
         private String makeHttpRequest(URL url) throws IOException {
 
             String jsonResponse = "";
             HttpURLConnection urlConnection = null;
             InputStream inputStream = null;
+
             try {
                 urlConnection = (HttpURLConnection) url.openConnection();
                 urlConnection.setRequestMethod("GET");
@@ -165,11 +197,9 @@ public class MainActivity extends AppCompatActivity {
                     jsonResponse = readFromStream(inputStream);
                 } else {
                     Log.e(LOG_TAG, "Response code error: " + urlConnection.getResponseCode());
-
                 }
             } catch (IOException e) {
                 Log.e(LOG_TAG, "Problem getting JSON results", e);
-
             } finally {
                 if (urlConnection != null) {
                     urlConnection.disconnect();
@@ -178,7 +208,6 @@ public class MainActivity extends AppCompatActivity {
                     inputStream.close();
                 }
             }
-
             return jsonResponse;
         }
 
@@ -245,18 +274,16 @@ public class MainActivity extends AppCompatActivity {
                         infoLink = bookInfo.optString("infoLink");
 
                     String image = "";
-                    if (bookInfo.optString("image") != null)
-                        image = bookInfo.optString("image");
+                    if (bookInfo.optString("imageLinks") != null)
+                        image = bookInfo.getJSONObject("imageLinks").getString("smallThumbnail");
 
                     books.add(new Book(title, description, infoLink, authors, image));
-
                 }
             } catch (JSONException e) {
                 Log.e(LOG_TAG, "Problem with parsing book JSON results", e);
             }
 
             return books;
-
         }
 
 

@@ -1,6 +1,8 @@
 package com.martynaskairys.udacitybl;
 
 
+import org.json.JSONObject;
+
 public class Book {
 
     private String mBookTitle;

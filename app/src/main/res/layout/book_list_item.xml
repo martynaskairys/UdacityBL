@@ -10,6 +10,7 @@
         android:id="@+id/image"
         android:layout_height="wrap_content"
         android:scaleType="centerCrop"
+        android:padding="8dp"
         android:layout_weight="1"/>
 
     <LinearLayout
